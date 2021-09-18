@@ -28,10 +28,20 @@ public:
         left_right_pub = nh.advertise<visualization_msgs::Marker>("track_follower/left_right_vis", 10);
         goal_pub = nh.advertise<visualization_msgs::Marker>("track_follower/track_follower_goal_vis", 10);
         twist_pub = nh.advertise<geometry_msgs::TwistStamped>("vehicle_velocity", 10);
+
+        /* jaemin */
+        prev_left_object_.x = 1.0;
+        prev_left_object_.y = 1.0;
+        prev_left_object_.z = 0.0;
+
+        prev_right_object_.x = 1.0;
+        prev_right_object_.y = -1.0;
+        prev_right_object_.z = 0.0;
     }
 
     void poseArrayCB(const geometry_msgs::PoseArrayConstPtr& ptr){
-        goal = extractLeftandRightLavacons(*ptr);
+        //goal = extractLeftandRightLavacons(*ptr);
+        goal = extractLeftandRightLavacons_jaemin(*ptr);
         calcVelocityWithPurePursuit(goal);
         visualize();
     }
@@ -84,6 +94,75 @@ public:
         g.position.x = (left.position.x + right.position.x) / 2.0;
         g.position.y = (left.position.y + right.position.y) / 2.0;
         return g;
+    }
+
+    geometry_msgs::Pose extractLeftandRightLavacons_jaemin(geometry_msgs::PoseArray lavacons){
+        geometry_msgs::Point left_start_point;
+        left_start_point.x = 0.0;
+        left_start_point.y = 1.5;
+        left_start_point.z = 0.0;
+
+        geometry_msgs::Point right_start_point;
+        right_start_point.x = 0.0;
+        right_start_point.y = -1.5;
+        right_start_point.z = 0.0;
+
+        geometry_msgs::Point left_nearest_point = findNearestPoint(lavacons, left_start_point, 0);
+        geometry_msgs::Point right_nearest_point = findNearestPoint(lavacons, right_start_point, 1);
+
+        geometry_msgs::Pose goal_point;
+        goal_point.position.x = (left_nearest_point.x + right_nearest_point.x)/2.0;
+        goal_point.position.y = (left_nearest_point.y + right_nearest_point.y)/2.0;
+
+        left.position.x = left_nearest_point.x;
+        left.position.y = left_nearest_point.y;
+        right.position.x = right_nearest_point.x;
+        right.position.y = right_nearest_point.y;
+        return goal_point;
+    }
+
+    geometry_msgs::Point findNearestPoint(geometry_msgs::PoseArray lavacons, geometry_msgs::Point start_point, int line_num){
+        const double x_limit_ = 5.0; //meter
+
+        geometry_msgs::Point pt;
+        geometry_msgs::Point object_pt;
+
+        pt = start_point;
+
+        std::vector<std::pair<geometry_msgs::Point, double>> list;
+
+
+        for(size_t k = 0; k < lavacons.poses.size(); ++k)
+        {
+            if(lavacons.poses[k].position.x < x_limit_ && lavacons.poses[k].position.x > 1.0)
+            {
+                if(line_num == 0 && lavacons.poses[k].position.y < 0.2) continue;
+                if(line_num == 1 && lavacons.poses[k].position.y > -0.2) continue;
+
+                object_pt.x = lavacons.poses[k].position.x;
+                object_pt.y = lavacons.poses[k].position.y;
+                object_pt.z = lavacons.poses[k].position.z;
+                list.push_back(std::make_pair(object_pt, fabs(lavacons.poses[k].position.y - pt.y)));
+            }
+        }
+    
+        std::sort(list.begin(), list.end(), [](auto&& l, auto&& r){
+            return l.second < r.second;
+        });
+
+        if(list.size() == 0)
+        {
+            if(line_num == 0) return prev_left_object_;
+            if(line_num == 1) return prev_right_object_;
+        }
+        else
+        {
+            object_pt = list[0].first;
+            if(line_num == 0) prev_left_object_ = object_pt;
+            if(line_num == 1) prev_right_object_ = object_pt;
+        }
+    
+        return object_pt;
     }
 
     void calcVelocityWithPurePursuit(geometry_msgs::Pose goal){
@@ -167,6 +246,9 @@ private:
     ros::Subscriber lavacons_pos_sub;
     ros::Publisher left_right_pub, goal_pub;
     ros::Publisher twist_pub;
+
+    geometry_msgs::Point prev_left_object_;
+    geometry_msgs::Point prev_right_object_;
 };
 
 int main(int argc, char * argv[]){

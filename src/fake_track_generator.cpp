@@ -55,22 +55,15 @@ public:
             double dt = 1.0 / CALCULATION_FREQUENCY;
             
             // calc transformation matrix. See http://planning.cs.uiuc.edu/node108.html
-            Eigen::Matrix2d body_world_rotation;
-            body_world_rotation << std::cos(car_yaw_world), -std::sin(car_yaw_world)
-                                    , std::sin(car_yaw_world), std::cos(car_yaw_world);
-            Eigen::Matrix2d world_body_rotation = body_world_rotation.inverse();
-            std::cout << world_body_rotation << std::endl;
+            Eigen::Matrix2d Rwb;
+            Rwb << std::cos(car_yaw_world), -std::sin(car_yaw_world)
+                                    ,std::sin(car_yaw_world), std::cos(car_yaw_world);
             
-            Eigen::Matrix3d world_body_transform; // for future use
-            world_body_transform << world_body_rotation(0), world_body_rotation(1), -car_pos_world(0),
-                                world_body_rotation(2), world_body_rotation(3), -car_pos_world(1),
-                                0, 0, 1;
-
             // calculate car's velocity in world frame
             Eigen::Vector2d car_v_body;
             car_v_body << car_twist_body.twist.linear.x, 0;
             std::cout << "car v body : " << car_v_body << std::endl;
-            Eigen::Vector2d car_v_world = world_body_rotation * car_v_body;
+            Eigen::Vector2d car_v_world = Rwb * car_v_body;
             std::cout << "car v world : " << car_v_world << std::endl;
 
             // update car's position in world frame
@@ -82,9 +75,9 @@ public:
             lavacons_body_near.resize(0);            
             for(auto&& lavacon : lavacons_world){
                 if (lavacon.dist(car_pos_world(0), car_pos_world(1)) < max_detectable_range){
-                    Eigen::Vector3d lavacon_world;
-                    lavacon_world << lavacon.x, lavacon.y, 1;
-                    Eigen::Vector3d lavacon_body = world_body_transform * lavacon_world;
+                    Eigen::Vector2d lavacon_body;
+                    lavacon_body << lavacon.x - car_pos_world(0), lavacon.y - car_pos_world(1);
+                    lavacon_body = Rwb.inverse() * lavacon_body;
                     lavacons_body_near.emplace_back(lavacon_body(0), lavacon_body(1)); 
                 }
             }
@@ -177,7 +170,7 @@ public:
 
         // 4. publish car pose in world frame
         visualization_msgs::Marker marker_car_world;
-        marker_car_world.header.frame_id = "world";
+        marker_car_world.header.frame_id = "body";
         marker_car_world.header.stamp = ros::Time::now();
         marker_car_world.ns = "fake_track_generator";
         marker_car_world.id = id++;
@@ -193,24 +186,24 @@ public:
         constexpr double CAR_WIDTH = 0.8; // meter
         constexpr double CAR_HEIGHT = 1.3; // meter
         geometry_msgs::Point p;
-        p.x = car_pos_world(0) + CAR_HEIGHT/2; //
-        p.y = car_pos_world(1) + CAR_WIDTH/2;
+        p.x = + CAR_HEIGHT/2; //
+        p.y = + CAR_WIDTH/2;
         marker_car_world.points.push_back(p);
         marker_car_world.colors.push_back(c);
-        p.x = car_pos_world(0) + CAR_HEIGHT/2; //
-        p.y = car_pos_world(1) - CAR_WIDTH/2;
+        p.x =  + CAR_HEIGHT/2; //
+        p.y =  - CAR_WIDTH/2;
         marker_car_world.points.push_back(p);
         marker_car_world.colors.push_back(c);
-        p.x = car_pos_world(0) - CAR_HEIGHT/2; //
-        p.y = car_pos_world(1) - CAR_WIDTH/2;
+        p.x =  - CAR_HEIGHT/2; //
+        p.y =  - CAR_WIDTH/2;
         marker_car_world.points.push_back(p);
         marker_car_world.colors.push_back(c);
-        p.x = car_pos_world(0) - CAR_HEIGHT/2; //
-        p.y = car_pos_world(1) + CAR_WIDTH/2;
+        p.x =  - CAR_HEIGHT/2; //
+        p.y =  + CAR_WIDTH/2;
         marker_car_world.points.push_back(p);
         marker_car_world.colors.push_back(c);
-        p.x = car_pos_world(0) + CAR_HEIGHT/2; //
-        p.y = car_pos_world(1) + CAR_WIDTH/2;
+        p.x =  + CAR_HEIGHT/2; //
+        p.y =  + CAR_WIDTH/2;
         marker_car_world.points.push_back(p);
         marker_car_world.colors.push_back(c);
         
@@ -223,6 +216,7 @@ public:
         car_pos.header.stamp = ros::Time::now();
         car_pos.pose.position.x = car_pos_world(0);
         car_pos.pose.position.y = car_pos_world(1);
+        car_pos.pose.orientation = tf::createQuaternionMsgFromYaw(car_yaw_world);
         car_pos_pub.publish(car_pos);
     }
 
