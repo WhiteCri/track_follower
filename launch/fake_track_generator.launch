@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="track_follower" name="fake_track_generator" type="fake_track_generator"/>
+    <rosparam command="load" file="$(find track_follower)/param/fake_track_generator.yaml"/>
+    <node pkg="rviz" type="rviz" name="rviz_asl" args="-d $(find track_follower)/rviz/display.rviz" />>
+</launch>

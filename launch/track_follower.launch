@@ -1,0 +1,4 @@
+<launch>
+    <node pkg="track_follower" name="track_follower" type="track_follower"/>
+    <rosparam command="load" file="$(find track_follower)/param/track_follower.yaml"/>
+</launch>

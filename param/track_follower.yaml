@@ -1,0 +1,5 @@
+track_follower:
+   param1: 150 # degree
+   param2: 7 # meter
+   param3: 1 # meter
+   vehicle_velocity: 2 # m/s
